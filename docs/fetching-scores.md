@@ -2,7 +2,7 @@
 
 The `DefaultScorer` contract stores global scores for each credential group. Scores can be read on-chain in a single call — no iteration or multicall needed.
 
-**DefaultScorer address (Base mainnet & Sepolia):** `0x6a0b5ba649C7667A0C4Cd7FE8a83484AEE6C5345`
+**DefaultScorer address:** `0x6a0b5ba649C7667A0C4Cd7FE8a83484AEE6C5345` (Base mainnet) / `0x315044578dd9480dd25427e4a4d94b0fc2fa4f8c` (Base Sepolia)
 
 ## Get All Scores
 

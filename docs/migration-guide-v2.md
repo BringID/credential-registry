@@ -4,14 +4,12 @@ This guide is for repos that integrate with the BringID CredentialRegistry contr
 
 ## Deployed Contracts
 
-Contract addresses are identical on both chains (same deployer, same nonce).
-
-| Contract | Address | Chains |
+| Contract | Base Mainnet (8453) | Base Sepolia (84532) |
 |---|---|---|
-| Semaphore | `0x8A1fd199516489B0Fb7153EB5f075cDAC83c693D` | mainnet (8453), Sepolia (84532) |
-| CredentialRegistry | `0xfd600B14Dc5A145ec9293Fd5768ae10Ccc1E91Fe` | mainnet (8453), Sepolia (84532) |
-| DefaultScorer | `0x6a0b5ba649C7667A0C4Cd7FE8a83484AEE6C5345` | mainnet (8453), Sepolia (84532) |
-| ScorerFactory | `0x05321FAAD6315a04d5024Ee5b175AB1C62a3fd44` | mainnet (8453), Sepolia (84532) |
+| Semaphore | `0x8A1fd199516489B0Fb7153EB5f075cDAC83c693D` | `0x8A1fd199516489B0Fb7153EB5f075cDAC83c693D` |
+| CredentialRegistry | `0xfd600B14Dc5A145ec9293Fd5768ae10Ccc1E91Fe` | `0xbf9b2556e6dd64d60e08e3669cef2a4293e006db` |
+| DefaultScorer | `0x6a0b5ba649C7667A0C4Cd7FE8a83484AEE6C5345` | `0x315044578dd9480dd25427e4a4d94b0fc2fa4f8c` |
+| ScorerFactory | `0x05321FAAD6315a04d5024Ee5b175AB1C62a3fd44` | `0xaa03996d720c162fdff246e1d3ceecc792986750` |
 
 Owner: `0x6F0CDcd334BA91A5E221582665Cce0431aD4Fc0b`
 Trusted verifier (Sepolia): `0x3c50f7055D804b51e506Bc1EA7D082cB1548376C`

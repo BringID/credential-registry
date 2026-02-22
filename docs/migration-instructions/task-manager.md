@@ -138,7 +138,7 @@ Update user-facing error messages:
 ### 9. Environment Variables
 
 Add or update:
-- `REGISTRY_ADDRESS` — new CredentialRegistry address: `0xfd600B14Dc5A145ec9293Fd5768ae10Ccc1E91Fe` (same on both Base mainnet 8453 and Sepolia 84532)
+- `REGISTRY_ADDRESS` — new CredentialRegistry address: `0xfd600B14Dc5A145ec9293Fd5768ae10Ccc1E91Fe` (Base mainnet 8453) / `0xbf9b2556e6dd64d60e08e3669cef2a4293e006db` (Base Sepolia 84532)
 
 ## No Changes Required
 
