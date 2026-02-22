@@ -14,7 +14,7 @@ A web dashboard for third-party app developers to self-manage their BringID inte
 
 All interactions go to two contracts on Base (mainnet 8453 / Sepolia 84532):
 
-### CredentialRegistry (mainnet: `0xfd600B14Dc5A145ec9293Fd5768ae10Ccc1E91Fe`, Sepolia: `0xbf9b2556e6dd64d60e08e3669cef2a4293e006db`)
+### CredentialRegistry (`0xbF9b2556e6Dd64D60E08E3669CeF2a4293e006db`)
 
 | Function | Access | Description |
 |---|---|---|
@@ -31,7 +31,7 @@ All interactions go to two contracts on Base (mainnet 8453 / Sepolia 84532):
 | `credentialGroups(uint256 id)` | View | Returns `(status, validityDuration, familyId)`. |
 | `getCredentialGroupIds()` | View | Returns all registered credential group IDs. |
 
-### DefaultScorer (mainnet: `0x6a0b5ba649C7667A0C4Cd7FE8a83484AEE6C5345`, Sepolia: `0x315044578dd9480dd25427e4a4d94b0fc2fa4f8c`)
+### DefaultScorer (`0x315044578dd9480Dd25427E4a4d94b0fc2Fa4f8c`)
 
 Read-only from the dashboard's perspective (only BringID owner can write):
 
@@ -41,7 +41,9 @@ Read-only from the dashboard's perspective (only BringID owner can write):
 | `getScores(uint256[] credentialGroupIds)` | View | Scores for multiple groups. |
 | `getAllScores()` | View | All group IDs + scores. |
 
-### ScorerFactory (mainnet: `0x05321FAAD6315a04d5024Ee5b175AB1C62a3fd44`, Sepolia: `0xaa03996d720c162fdff246e1d3ceecc792986750`)
+### ScorerFactory (`0xAa03996D720C162Fdff246E1D3CEecc792986750`)
+
+Deploys DefaultScorer instances owned by the caller. Same address on both chains.
 
 | Function | Access | Description |
 |---|---|---|

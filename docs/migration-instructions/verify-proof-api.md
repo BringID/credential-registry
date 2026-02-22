@@ -91,11 +91,13 @@ If the API currently only returns `{ verified: boolean }` without scores, this c
 
 Update the registry whitelist:
 
+Contract addresses are identical on both chains (same deployer, same nonce).
+
 ```diff
   export const chainRegistries: Record<number, string[]> = {
 -   84532: ['0x0b2Ab187a6FD2d2F05fACc158611838c284E3a9c'],
-+   84532: ['0xbf9b2556e6dd64d60e08e3669cef2a4293e006db'],
-+   8453: ['0xfd600B14Dc5A145ec9293Fd5768ae10Ccc1E91Fe'],
++   84532: ['0xbF9b2556e6Dd64D60E08E3669CeF2a4293e006db'],
++   8453: ['0xbF9b2556e6Dd64D60E08E3669CeF2a4293e006db'],
   }
 ```
 
