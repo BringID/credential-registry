@@ -1,4 +1,4 @@
-# Migration Guide — Identity Registry v2 (PR #5)
+# Migration Guide — Credential Registry v2 (PR #5)
 
 This guide is for repos that integrate with the BringID CredentialRegistry contracts. It covers deployed addresses, new features, credential groups, default scores, and all ABI breaking changes.
 
@@ -9,9 +9,9 @@ Contract addresses are identical on both chains (same deployer, same nonce).
 | Contract | Address | Chains |
 |---|---|---|
 | Semaphore | `0x8A1fd199516489B0Fb7153EB5f075cDAC83c693D` | mainnet (8453), Sepolia (84532) |
-| CredentialRegistry | `0xfd600B14Dc5A145ec9293Fd5768ae10Ccc1E91Fe` | mainnet (8453), Sepolia (84532) |
-| DefaultScorer | `0x6a0b5ba649C7667A0C4Cd7FE8a83484AEE6C5345` | mainnet (8453), Sepolia (84532) |
-| ScorerFactory | `0x05321FAAD6315a04d5024Ee5b175AB1C62a3fd44` | mainnet (8453), Sepolia (84532) |
+| CredentialRegistry | `0xbF9b2556e6Dd64D60E08E3669CeF2a4293e006db` | mainnet (8453), Sepolia (84532) |
+| DefaultScorer | `0x315044578dd9480Dd25427E4a4d94b0fc2Fa4f8c` | mainnet (8453), Sepolia (84532) |
+| ScorerFactory | `0xAa03996D720C162Fdff246E1D3CEecc792986750` | mainnet (8453), Sepolia (84532) |
 
 Owner: `0x6F0CDcd334BA91A5E221582665Cce0431aD4Fc0b`
 Trusted verifier (Sepolia): `0x3c50f7055D804b51e506Bc1EA7D082cB1548376C`
@@ -157,9 +157,9 @@ Score is now on `DefaultScorer`. Semaphore group IDs are managed internally via 
 ```
 The `issuedAt` timestamp is signed by the verifier. The contract enforces `block.timestamp <= issuedAt + attestationValidityDuration` (default 30 minutes, configurable via `setAttestationValidityDuration()`).
 
-**`CredentialGroupProof`** — added `appId`:
+**`CredentialProof`** — added `appId`:
 ```diff
- struct CredentialGroupProof {
+ struct CredentialProof {
      uint256 credentialGroupId;
 +    uint256 appId;
      ISemaphore.SemaphoreProof semaphoreProof;
@@ -231,16 +231,16 @@ The `issuedAt` timestamp is signed by the verifier. The contract enforces `block
 
 The constructor now deploys a `DefaultScorer` automatically and adds the provided address as the first trusted verifier.
 
-### Error messages
+### Custom errors
 
-All `require` error strings now use a `BID::` prefix (e.g. `"BID::not registered"`, `"BID::app not active"`). If your integration matches on revert reason strings, update them accordingly.
+All revert conditions now use custom errors (e.g. `NotRegistered()`, `AppNotActive()`, `AlreadyRegistered()`) instead of string-based `require` messages. Custom errors are defined in `@bringid/contracts/Errors.sol`. If your integration matches on revert selectors, update to the new custom error selectors.
 
 ## Quick Migration Checklist
 
 - [ ] Update contract addresses to Base Sepolia values above
 - [ ] Update ABI imports — `ICredentialRegistry`, events, and structs have changed
 - [ ] Add `appId` and `issuedAt` to all `Attestation` structs
-- [ ] Add `appId` to all `CredentialGroupProof` structs
+- [ ] Add `appId` to all `CredentialProof` structs
 - [ ] Rename `idHash` → `credentialId` in attestation construction
 - [ ] Replace `joinGroup()` calls with `registerCredential()`
 - [ ] Replace `validateProof()` with `submitProof()` or `verifyProof()` (view)
@@ -251,4 +251,4 @@ All `require` error strings now use a `BID::` prefix (e.g. `"BID::not registered
 - [ ] Account for `credentialGroupId` in `CredentialRecord` — tracks which group within the family
 - [ ] For group changes within a family, use `initiateRecovery`/`executeRecovery` (not `renewCredential`)
 - [ ] If listening to events, update to new event names and signatures
-- [ ] If matching on revert reason strings, update to `BID::` prefixed messages
+- [ ] If matching on revert selectors, update to custom errors defined in `@bringid/contracts/Errors.sol`

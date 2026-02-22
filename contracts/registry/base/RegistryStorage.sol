@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.23;
 
-import "../Events.sol";
-import {ICredentialRegistry} from "../ICredentialRegistry.sol";
-import {ISemaphore} from "semaphore-protocol/interfaces/ISemaphore.sol";
-import {Ownable2Step} from "openzeppelin/access/Ownable2Step.sol";
-import {Pausable} from "openzeppelin/security/Pausable.sol";
-import {ReentrancyGuard} from "openzeppelin/security/ReentrancyGuard.sol";
+import "@bringid/contracts/interfaces/Errors.sol";
+import "@bringid/contracts/interfaces/Events.sol";
+import {ICredentialRegistry} from "@bringid/contracts/interfaces/ICredentialRegistry.sol";
+import {ISemaphore} from "@semaphore-protocol/contracts/interfaces/ISemaphore.sol";
+import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import {Pausable} from "@openzeppelin/contracts/security/Pausable.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 /// @title RegistryStorage
 /// @notice Base contract holding all state variables, internal helpers, and view helpers
@@ -48,7 +49,7 @@ abstract contract RegistryStorage is ICredentialRegistry, Ownable2Step, Pausable
     /// @notice Array of all registered credential group IDs (for enumeration).
     uint256[] public credentialGroupIds;
 
-    /// @notice Auto-incrementing app ID counter. Next app will get this ID.
+    /// @notice Nonce used in hash-based app ID generation. Incremented on each registerApp() call.
     uint256 public nextAppId = 1;
 
     /// @notice Address of the DefaultScorer contract deployed by the constructor.
@@ -103,11 +104,13 @@ abstract contract RegistryStorage is ICredentialRegistry, Ownable2Step, Pausable
 
     /// @dev Unpacks a 65-byte ECDSA signature into its (v, r, s) components.
     function _unpackSignature(bytes memory signature_) internal pure returns (uint8 v, bytes32 r, bytes32 s) {
-        require(signature_.length == 65, "BID::invalid attestation sig length");
+        if (signature_.length != 65) revert InvalidAttestationSigLength();
+        // Memory layout of `bytes memory`: first 32 bytes = length, followed by data.
+        // Signature layout (65 bytes): r (bytes 0-31) || s (bytes 32-63) || v (byte 64)
         assembly {
-            r := mload(add(signature_, 0x20))
-            s := mload(add(signature_, 0x40))
-            v := byte(0, mload(add(signature_, 0x60)))
+            r := mload(add(signature_, 0x20)) // skip length prefix, read first 32 bytes
+            s := mload(add(signature_, 0x40)) // read next 32 bytes
+            v := byte(0, mload(add(signature_, 0x60))) // read first byte of last 32-byte word
         }
     }
 

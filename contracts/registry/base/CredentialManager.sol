@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.23;
 
-import "../Events.sol";
+import "@bringid/contracts/interfaces/Errors.sol";
+import "@bringid/contracts/interfaces/Events.sol";
 import {AttestationVerifier} from "./AttestationVerifier.sol";
 
 /// @title CredentialManager
@@ -14,8 +15,7 @@ abstract contract CredentialManager is AttestationVerifier {
     /// @notice Register a credential using a verifier-signed attestation (bytes signature variant).
     /// @dev Convenience wrapper that unpacks a 65-byte signature into (v, r, s) components
     ///      and delegates to the main registerCredential implementation.
-    ///      The signature can be reused across all networks since it signs the attestation
-    ///      struct which includes the registry address.
+    ///      The signature is chain-bound — it includes the chain ID and registry address.
     /// @param attestation_ The attestation containing credential details and Semaphore commitment.
     /// @param signature_ 65-byte ECDSA signature (r || s || v).
     function registerCredential(Attestation memory attestation_, bytes memory signature_) public {
@@ -47,8 +47,8 @@ abstract contract CredentialManager is AttestationVerifier {
     {
         (address signer, bytes32 registrationHash) = verifyAttestation(attestation_, v, r, s);
         CredentialRecord storage cred = credentials[registrationHash];
-        require(!cred.registered, "BID::already registered");
-        require(attestation_.semaphoreIdentityCommitment != 0, "BID::invalid commitment");
+        if (cred.registered) revert AlreadyRegistered();
+        if (attestation_.semaphoreIdentityCommitment == 0) revert InvalidCommitment();
 
         // Lazily create the per-app Semaphore group
         uint256 semaphoreGroupId = _ensureAppSemaphoreGroup(attestation_.credentialGroupId, attestation_.appId);
@@ -107,12 +107,12 @@ abstract contract CredentialManager is AttestationVerifier {
     {
         (address signer, bytes32 registrationHash) = verifyAttestation(attestation_, v, r, s);
         CredentialRecord storage cred = credentials[registrationHash];
-        require(cred.registered, "BID::not registered");
-        require(attestation_.semaphoreIdentityCommitment != 0, "BID::invalid commitment");
-        require(attestation_.semaphoreIdentityCommitment == cred.commitment, "BID::commitment mismatch");
-        require(cred.pendingRecovery.executeAfter == 0, "BID::recovery pending");
+        if (!cred.registered) revert NotRegistered();
+        if (attestation_.semaphoreIdentityCommitment == 0) revert InvalidCommitment();
+        if (attestation_.semaphoreIdentityCommitment != cred.commitment) revert CommitmentMismatch();
+        if (cred.pendingRecovery.executeAfter != 0) revert RecoveryPending();
 
-        require(attestation_.credentialGroupId == cred.credentialGroupId, "BID::group mismatch");
+        if (attestation_.credentialGroupId != cred.credentialGroupId) revert GroupMismatch();
 
         // Re-add to Semaphore if credential was expired and removed
         if (cred.expired) {
@@ -163,12 +163,12 @@ abstract contract CredentialManager is AttestationVerifier {
         uint256 familyId = credentialGroups[credentialGroupId_].familyId;
         bytes32 registrationHash = _registrationHash(familyId, credentialGroupId_, credentialId_, appId_);
         CredentialRecord storage cred = credentials[registrationHash];
-        require(cred.registered, "BID::not registered");
-        require(!cred.expired, "BID::already expired");
-        require(credentialGroupId_ == cred.credentialGroupId, "BID::group mismatch");
-        require(cred.pendingRecovery.executeAfter == 0, "BID::recovery pending");
-        require(cred.expiresAt > 0, "BID::no expiry set");
-        require(block.timestamp >= cred.expiresAt, "BID::not yet expired");
+        if (!cred.registered) revert NotRegistered();
+        if (cred.expired) revert AlreadyExpired();
+        if (credentialGroupId_ != cred.credentialGroupId) revert GroupMismatch();
+        if (cred.pendingRecovery.executeAfter != 0) revert RecoveryPending();
+        if (cred.expiresAt == 0) revert NoExpirySet();
+        if (block.timestamp < cred.expiresAt) revert NotYetExpired();
 
         uint256 semaphoreGroupId = appSemaphoreGroups[credentialGroupId_][appId_];
         SEMAPHORE.removeMember(semaphoreGroupId, cred.commitment, merkleProofSiblings_);

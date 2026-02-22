@@ -2,8 +2,8 @@
 pragma solidity ^0.8.23;
 
 import {Script, console} from "forge-std/Script.sol";
-import {ICredentialRegistry as IRegistry} from "../src/registry/ICredentialRegistry.sol";
-import {ECDSA} from "openzeppelin/utils/cryptography/ECDSA.sol";
+import {ICredentialRegistry as IRegistry} from "@bringid/contracts/interfaces/ICredentialRegistry.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 contract Generate is Script {
     using ECDSA for bytes32;
@@ -11,6 +11,7 @@ contract Generate is Script {
     function run() public {
         IRegistry.Attestation memory verifierMessage = IRegistry.Attestation({
             registry: vm.envAddress("REGISTRY"),
+            chainId: block.chainid,
             credentialGroupId: vm.envUint("CREDENTIAL_GROUP_ID"),
             credentialId: vm.envBytes32("CREDENTIAL_ID"),
             appId: vm.envUint("APP_ID"),

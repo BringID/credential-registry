@@ -1,4 +1,4 @@
-## BringID Identity Registry
+## BringID Credential Registry
 
 Privacy-preserving credential system built with Semaphore zero-knowledge proofs. Users register credentials via verifier-signed attestations, then prove membership without revealing their identity.
 
@@ -11,18 +11,18 @@ Contract addresses are identical on both chains (same deployer, same nonce).
 | Contract | Address |
 |---|---|
 | Semaphore | [`0x8A1fd199516489B0Fb7153EB5f075cDAC83c693D`](https://basescan.org/address/0x8A1fd199516489B0Fb7153EB5f075cDAC83c693D) |
-| CredentialRegistry | [`0xfd600B14Dc5A145ec9293Fd5768ae10Ccc1E91Fe`](https://basescan.org/address/0xfd600B14Dc5A145ec9293Fd5768ae10Ccc1E91Fe) |
-| DefaultScorer | [`0x6a0b5ba649C7667A0C4Cd7FE8a83484AEE6C5345`](https://basescan.org/address/0x6a0b5ba649C7667A0C4Cd7FE8a83484AEE6C5345) |
-| ScorerFactory | [`0x05321FAAD6315a04d5024Ee5b175AB1C62a3fd44`](https://basescan.org/address/0x05321FAAD6315a04d5024Ee5b175AB1C62a3fd44) |
+| CredentialRegistry | [`0xbF9b2556e6Dd64D60E08E3669CeF2a4293e006db`](https://basescan.org/address/0xbF9b2556e6Dd64D60E08E3669CeF2a4293e006db) |
+| DefaultScorer | [`0x315044578dd9480Dd25427E4a4d94b0fc2Fa4f8c`](https://basescan.org/address/0x315044578dd9480Dd25427E4a4d94b0fc2Fa4f8c) |
+| ScorerFactory | [`0xAa03996D720C162Fdff246E1D3CEecc792986750`](https://basescan.org/address/0xAa03996D720C162Fdff246E1D3CEecc792986750) |
 
 ### Base Sepolia (chain ID 84532)
 
 | Contract | Address |
 |---|---|
 | Semaphore | [`0x8A1fd199516489B0Fb7153EB5f075cDAC83c693D`](https://sepolia.basescan.org/address/0x8A1fd199516489B0Fb7153EB5f075cDAC83c693D) |
-| CredentialRegistry | [`0xfd600B14Dc5A145ec9293Fd5768ae10Ccc1E91Fe`](https://sepolia.basescan.org/address/0xfd600B14Dc5A145ec9293Fd5768ae10Ccc1E91Fe) |
-| DefaultScorer | [`0x6a0b5ba649C7667A0C4Cd7FE8a83484AEE6C5345`](https://sepolia.basescan.org/address/0x6a0b5ba649C7667A0C4Cd7FE8a83484AEE6C5345) |
-| ScorerFactory | [`0x05321FAAD6315a04d5024Ee5b175AB1C62a3fd44`](https://sepolia.basescan.org/address/0x05321FAAD6315a04d5024Ee5b175AB1C62a3fd44) |
+| CredentialRegistry | [`0xbF9b2556e6Dd64D60E08E3669CeF2a4293e006db`](https://sepolia.basescan.org/address/0xbF9b2556e6Dd64D60E08E3669CeF2a4293e006db) |
+| DefaultScorer | [`0x315044578dd9480Dd25427E4a4d94b0fc2Fa4f8c`](https://sepolia.basescan.org/address/0x315044578dd9480Dd25427E4a4d94b0fc2Fa4f8c) |
+| ScorerFactory | [`0xAa03996D720C162Fdff246E1D3CEecc792986750`](https://sepolia.basescan.org/address/0xAa03996D720C162Fdff246E1D3CEecc792986750) |
 
 ### Credential Groups
 
@@ -43,6 +43,61 @@ Contract addresses are identical on both chains (same deployer, same nonce).
 | 13 | Apple Subs | — | — | 10 | 180 days |
 | 14 | Binance KYC | — | — | 20 | 180 days |
 | 15 | OKX KYC | — | — | 20 | 180 days |
+
+## Integrating Proof Consumption (Front-Running Protection)
+
+When a smart contract consumes BringID proofs on-chain (e.g. an airdrop or gating contract), the Semaphore `scope` is bound to `msg.sender` + `context`. This means any transaction routed through the same contract shares the same scope — an attacker can copy proofs from the mempool and front-run the original caller.
+
+**Solution:** Bind the Semaphore `message` field to the intended recipient. The `@bringid/contracts` package provides `BringIDGated` — an abstract base that handles app ID validation, message binding, and proof submission. Your contract only needs to check the returned score.
+
+### Quick start — `BringIDGated`
+
+```solidity
+import {BringIDGated} from "@bringid/contracts/BringIDGated.sol";
+import {CredentialProof} from "@bringid/contracts/interfaces/Types.sol";
+
+contract MyAirdrop is BringIDGated {
+    uint256 constant MIN_SCORE = 100; // required reputation threshold
+
+    constructor(address registry_, uint256 appId_)
+        BringIDGated(registry_, appId_)
+    {}
+
+    // proofs_ are generated off-chain via BringID SDK.
+    // Each proof is a zero-knowledge attestation of a verified credential
+    // (e.g. GitHub account, Farcaster profile, KYC) — proving ownership
+    // without revealing the underlying identity.
+    function claim(
+        address recipient_,
+        CredentialProof[] calldata proofs_
+    ) external {
+        // Validates proofs, prevents reuse, aggregates score from registry
+        uint256 bringIDScore = _submitProofsForRecipient(recipient_, proofs_);
+
+        // Enforce a minimum score
+        if (bringIDScore < MIN_SCORE) revert InsufficientScore();
+
+        // Transfer tokens
+        ...
+    }
+}
+```
+
+### Off-chain proof generation
+
+When generating proofs for a message-binding-aware contract, set the `message` to `keccak256(abi.encodePacked(recipientAddress))`:
+
+```javascript
+import { generateProof } from "@semaphore-protocol/core";
+import { ethers } from "ethers";
+
+const recipient = "0x1234...";
+const message = ethers.solidityPackedKeccak256(["address"], [recipient]);
+
+const proof = await generateProof(identity, group, message, scope);
+```
+
+See [`docs/proof-message-binding.md`](docs/proof-message-binding.md) for a full explanation of scope vs. message, why putting the recipient in `context` breaks sybil resistance, and patterns for custom message semantics. See [`contracts/examples/SimpleAirdrop.sol`](contracts/examples/SimpleAirdrop.sol) for a complete example. For custom message semantics beyond simple recipient binding, compute your own expected message and validate manually.
 
 ## Usage
 

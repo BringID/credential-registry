@@ -14,7 +14,7 @@ A web dashboard for third-party app developers to self-manage their BringID inte
 
 All interactions go to two contracts on Base (mainnet 8453 / Sepolia 84532):
 
-### CredentialRegistry (`0xfd600B14Dc5A145ec9293Fd5768ae10Ccc1E91Fe`)
+### CredentialRegistry (`0xbF9b2556e6Dd64D60E08E3669CeF2a4293e006db`)
 
 | Function | Access | Description |
 |---|---|---|
@@ -31,7 +31,7 @@ All interactions go to two contracts on Base (mainnet 8453 / Sepolia 84532):
 | `credentialGroups(uint256 id)` | View | Returns `(status, validityDuration, familyId)`. |
 | `getCredentialGroupIds()` | View | Returns all registered credential group IDs. |
 
-### DefaultScorer (`0x6a0b5ba649C7667A0C4Cd7FE8a83484AEE6C5345`)
+### DefaultScorer (`0x315044578dd9480Dd25427E4a4d94b0fc2Fa4f8c`)
 
 Read-only from the dashboard's perspective (only BringID owner can write):
 
@@ -41,7 +41,7 @@ Read-only from the dashboard's perspective (only BringID owner can write):
 | `getScores(uint256[] credentialGroupIds)` | View | Scores for multiple groups. |
 | `getAllScores()` | View | All group IDs + scores. |
 
-### ScorerFactory (`0x05321FAAD6315a04d5024Ee5b175AB1C62a3fd44`)
+### ScorerFactory (`0xAa03996D720C162Fdff246E1D3CEecc792986750`)
 
 Deploys DefaultScorer instances owned by the caller. Same address on both chains.
 
@@ -151,7 +151,7 @@ If the app's scorer is a contract owned by the connected wallet (not the Default
 | Framework | Next.js (App Router) | Standard for web3 dashboards, SSG-capable |
 | Wallet | wagmi + viem + ConnectKit (or RainbowKit) | De facto standard, Base chain support |
 | Styling | Tailwind CSS | Fast iteration, no component library lock-in |
-| Contract ABIs | Copy from `identity-registry` build artifacts (`out/`) | Typed via wagmi CLI codegen |
+| Contract ABIs | Copy from `credential-registry` build artifacts (`out/`) | Typed via wagmi CLI codegen |
 | Chain config | Base mainnet (8453) + Base Sepolia (84532) | Match the deployed contracts |
 | Hosting | Vercel | Zero-config Next.js deploys |
 | Event indexing | viem `getLogs` with filters | No subgraph needed for v1 — event volume is low |
@@ -162,7 +162,7 @@ No backend or database. Everything reads from chain state and events.
 
 ## Contract ABIs Needed
 
-From the `identity-registry` `out/` directory after `forge build`:
+From the `credential-registry` `out/` directory after `forge build`:
 
 - `out/CredentialRegistry.sol/CredentialRegistry.json` — full ABI
 - `out/DefaultScorer.sol/DefaultScorer.json` — full ABI
@@ -199,7 +199,7 @@ No separate `CustomScorer` contract — `DefaultScorer` handles both use cases.
 
 **Benefits over raw bytecode deploy:** discoverable (index `ScorerCreated` events), simpler UX (single function call vs raw deploy), verifiable on block explorer.
 
-The `ScorerFactory` contract lives in this repo (`identity-registry`) under `src/scoring/` and is deployed alongside the other contracts.
+The `ScorerFactory` contract lives in this repo (`credential-registry`) under `contracts/scoring/` and is deployed alongside the other contracts.
 
 ---
 
@@ -226,13 +226,13 @@ Query strategy:
 
 ## Error Handling
 
-Map contract revert strings to user-friendly messages:
+Map custom error reverts to user-friendly messages:
 
-| Revert | User Message |
+| Error | User Message |
 |---|---|
-| `BID::not app admin` | You are not the admin of this app. |
-| `BID::app not active` | This app is currently suspended. |
-| `BID::app not suspended` | This app is already active. |
+| `NotAppAdmin()` | You are not the admin of this app. |
+| `AppNotActive()` | This app is currently suspended. |
+| `AppNotSuspended()` | This app is already active. |
 
 ---
 

@@ -1,14 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.23;
 
-import {IScorer} from "../registry/IScorer.sol";
-import {Ownable2Step} from "openzeppelin/access/Ownable2Step.sol";
+import {IScorer} from "../interfaces/IScorer.sol";
+import {ERC165} from "@openzeppelin/contracts/utils/introspection/ERC165.sol";
+import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 
 /// @title DefaultScorer
 /// @notice Scoring contract that stores scores per credential group.
 ///         Used as the global default scorer (owned by BringID) and as app-specific
 ///         custom scorers (deployed via ScorerFactory, owned by the app admin).
-contract DefaultScorer is IScorer, Ownable2Step {
+contract DefaultScorer is IScorer, ERC165, Ownable2Step {
+    error LengthMismatch();
+
     event ScoreSet(uint256 indexed credentialGroupId, uint256 score);
 
     mapping(uint256 credentialGroupId => uint256) public scores;
@@ -18,6 +22,11 @@ contract DefaultScorer is IScorer, Ownable2Step {
     /// @param owner_ The address that will own this scorer.
     constructor(address owner_) {
         _transferOwnership(owner_);
+    }
+
+    /// @notice Returns true if this contract implements the given interface.
+    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC165, IERC165) returns (bool) {
+        return interfaceId == type(IScorer).interfaceId || super.supportsInterface(interfaceId);
     }
 
     /// @notice Sets the score for a credential group.
@@ -36,14 +45,18 @@ contract DefaultScorer is IScorer, Ownable2Step {
     /// @param credentialGroupIds_ The credential group IDs.
     /// @param scores_ The score values (must match length of credentialGroupIds_).
     function setScores(uint256[] calldata credentialGroupIds_, uint256[] calldata scores_) external onlyOwner {
-        require(credentialGroupIds_.length == scores_.length, "length mismatch");
-        for (uint256 i; i < credentialGroupIds_.length; ++i) {
+        if (credentialGroupIds_.length != scores_.length) revert LengthMismatch();
+        uint256 len = credentialGroupIds_.length;
+        for (uint256 i; i < len;) {
             if (!_isTracked[credentialGroupIds_[i]]) {
                 _scoredGroupIds.push(credentialGroupIds_[i]);
                 _isTracked[credentialGroupIds_[i]] = true;
             }
             scores[credentialGroupIds_[i]] = scores_[i];
             emit ScoreSet(credentialGroupIds_[i], scores_[i]);
+            unchecked {
+                ++i;
+            }
         }
     }
 
@@ -57,9 +70,13 @@ contract DefaultScorer is IScorer, Ownable2Step {
     /// @param credentialGroupIds_ The credential group IDs.
     /// @return scores_ The score values.
     function getScores(uint256[] calldata credentialGroupIds_) external view returns (uint256[] memory scores_) {
-        scores_ = new uint256[](credentialGroupIds_.length);
-        for (uint256 i; i < credentialGroupIds_.length; ++i) {
+        uint256 len = credentialGroupIds_.length;
+        scores_ = new uint256[](len);
+        for (uint256 i; i < len;) {
             scores_[i] = scores[credentialGroupIds_[i]];
+            unchecked {
+                ++i;
+            }
         }
     }
 
@@ -70,8 +87,11 @@ contract DefaultScorer is IScorer, Ownable2Step {
         credentialGroupIds_ = _scoredGroupIds;
         uint256 len = _scoredGroupIds.length;
         scores_ = new uint256[](len);
-        for (uint256 i; i < len; ++i) {
+        for (uint256 i; i < len;) {
             scores_[i] = scores[_scoredGroupIds[i]];
+            unchecked {
+                ++i;
+            }
         }
     }
 }

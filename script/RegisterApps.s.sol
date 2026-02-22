@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 
-import {CredentialRegistry, ICredentialRegistry} from "../src/registry/CredentialRegistry.sol";
+import {CredentialRegistry} from "../contracts/registry/CredentialRegistry.sol";
+import {ICredentialRegistry} from "@bringid/contracts/interfaces/ICredentialRegistry.sol";
 import {Script, console} from "forge-std/Script.sol";
 
 contract RegisterApps is Script {
@@ -14,12 +15,10 @@ contract RegisterApps is Script {
             revert("CREDENTIAL_REGISTRY_ADDRESS should be provided");
         }
 
-        uint256 appId1 = registry.registerApp(0);
-        uint256 appId2 = registry.registerApp(0);
-        uint256 appId3 = registry.registerApp(0);
+        uint256 appId = registry.registerApp(0);
         vm.stopBroadcast();
 
-        console.log("Registered app IDs:", appId1, appId2, appId3);
+        console.log("Registered app ID:", appId);
         console.log("On registry:", address(registry));
     }
 }

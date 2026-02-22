@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.23;
 
-import {ISemaphore} from "semaphore-protocol/interfaces/ISemaphore.sol";
+import {CredentialProof} from "./Types.sol";
 
 /// @title ICredentialRegistry
 /// @notice Interface for the BringID Credential Registry — a privacy-preserving credential
@@ -75,18 +75,9 @@ interface ICredentialRegistry {
         RecoveryRequest pendingRecovery;
     }
 
-    /// @notice A proof binding a Semaphore ZK proof to a specific credential group and app.
-    /// @param credentialGroupId The credential group being proven.
-    /// @param appId The app identity used (determines which per-app Semaphore group).
-    /// @param semaphoreProof The Semaphore zero-knowledge proof (membership + nullifier).
-    struct CredentialGroupProof {
-        uint256 credentialGroupId;
-        uint256 appId;
-        ISemaphore.SemaphoreProof semaphoreProof;
-    }
-
     /// @notice A verifier-signed attestation authorizing a credential operation.
-    /// @param registry Address of the CredentialRegistry contract (prevents cross-chain replay).
+    /// @param registry Address of the CredentialRegistry contract.
+    /// @param chainId Chain ID this attestation is bound to (prevents cross-chain replay).
     /// @param credentialGroupId The credential group to register/renew/recover into.
     /// @param credentialId Application-specific credential identity derived by the verifier.
     /// @param appId The app this attestation is scoped to.
@@ -94,6 +85,7 @@ interface ICredentialRegistry {
     /// @param issuedAt Timestamp when the verifier created this attestation (for freshness checks).
     struct Attestation {
         address registry;
+        uint256 chainId;
         uint256 credentialGroupId;
         bytes32 credentialId;
         uint256 appId;
@@ -116,6 +108,10 @@ interface ICredentialRegistry {
     /// @notice Returns all registered credential group IDs.
     /// @return Array of credential group IDs.
     function getCredentialGroupIds() external view returns (uint256[] memory);
+
+    /// @notice Returns all Semaphore group IDs created for an app.
+    /// @param appId_ The app ID to query.
+    /// @return Array of Semaphore group IDs associated with the app.
     function getAppSemaphoreGroupIds(uint256 appId_) external view returns (uint256[] memory);
 
     /// @notice Verifies an attestation's validity and recovers the signer.
@@ -163,34 +159,54 @@ interface ICredentialRegistry {
     // ── Proof validation ────────────────────────
 
     /// @notice Submits a single ZK proof, consuming the Semaphore nullifier, and returns the score.
-    /// @param context_ Application-defined context value combined with msg.sender to form the scope.
+    /// @dev WARNING: The `message` field of the Semaphore proof is NOT validated. Smart contract
+    ///      callers are vulnerable to mempool front-running unless they validate `message` binding
+    ///      themselves. See `BringIDGated` for a ready-made helper.
+    /// @param appId_ The app ID that the proof must target. Included in the scope:
+    ///        `scope = keccak256(appId_, msg.sender, context_)`.
+    /// @param context_ Application-defined context value combined with appId_ and msg.sender to form the scope.
     /// @param proof The credential group proof to validate.
     /// @return The credential group's score from the app's scorer.
-    function submitProof(uint256 context_, CredentialGroupProof calldata proof) external returns (uint256);
+    function submitProof(uint256 appId_, uint256 context_, CredentialProof calldata proof) external returns (uint256);
 
     /// @notice Submits multiple ZK proofs, consuming nullifiers, and returns the aggregate score.
-    /// @param context_ Application-defined context value combined with msg.sender to form the scope.
+    /// @dev WARNING: The `message` field of each Semaphore proof is NOT validated. Smart contract
+    ///      callers are vulnerable to mempool front-running unless they validate `message` binding
+    ///      themselves. See `BringIDGated` for a ready-made helper.
+    /// @param appId_ The app ID that all proofs must target (see submitProof).
+    /// @param context_ Application-defined context value combined with appId_ and msg.sender to form the scope.
     /// @param proofs Array of credential group proofs to validate.
     /// @return The total score across all validated credential groups.
-    function submitProofs(uint256 context_, CredentialGroupProof[] calldata proofs) external returns (uint256);
+    function submitProofs(uint256 appId_, uint256 context_, CredentialProof[] calldata proofs)
+        external
+        returns (uint256);
 
     /// @notice Verifies a single ZK proof without consuming the nullifier (view-only).
-    /// @param context_ Application-defined context value combined with msg.sender to form the scope.
+    /// @param appId_ The app ID that the proof must target (see submitProof).
+    /// @param context_ Application-defined context value combined with appId_ and msg.sender to form the scope.
     /// @param proof The credential group proof to verify.
     /// @return True if the proof is valid.
-    function verifyProof(uint256 context_, CredentialGroupProof calldata proof) external view returns (bool);
+    function verifyProof(uint256 appId_, uint256 context_, CredentialProof calldata proof) external view returns (bool);
 
     /// @notice Verifies multiple ZK proofs without consuming nullifiers (view-only).
-    /// @param context_ Application-defined context value combined with msg.sender to form the scope.
+    /// @param appId_ The app ID that all proofs must target (see submitProof).
+    /// @param context_ Application-defined context value combined with appId_ and msg.sender to form the scope.
     /// @param proofs Array of credential group proofs to verify.
     /// @return True if all proofs are valid.
-    function verifyProofs(uint256 context_, CredentialGroupProof[] calldata proofs) external view returns (bool);
+    function verifyProofs(uint256 appId_, uint256 context_, CredentialProof[] calldata proofs)
+        external
+        view
+        returns (bool);
 
     /// @notice Verifies multiple proofs and returns the aggregate score (view-only).
-    /// @param context_ Application-defined context value combined with msg.sender to form the scope.
+    /// @param appId_ The app ID that all proofs must target (see submitProof).
+    /// @param context_ Application-defined context value combined with appId_ and msg.sender to form the scope.
     /// @param proofs Array of credential group proofs to verify and score.
     /// @return The total score across all verified credential groups.
-    function getScore(uint256 context_, CredentialGroupProof[] calldata proofs) external view returns (uint256);
+    function getScore(uint256 appId_, uint256 context_, CredentialProof[] calldata proofs)
+        external
+        view
+        returns (uint256);
 
     // ── Credential expiry ───────────────────────
 
@@ -251,11 +267,6 @@ interface ICredentialRegistry {
     /// @param validityDuration_ New validity duration in seconds (0 = no expiry).
     function setCredentialGroupValidityDuration(uint256 credentialGroupId_, uint256 validityDuration_) external;
 
-    /// @notice Updates the family ID for an existing credential group.
-    /// @param credentialGroupId_ The credential group ID to update.
-    /// @param familyId_ New family ID (0 = standalone, >0 = family grouping).
-    function setCredentialGroupFamily(uint256 credentialGroupId_, uint256 familyId_) external;
-
     /// @notice Updates the global attestation validity duration.
     /// @param duration_ New duration in seconds (must be > 0).
     function setAttestationValidityDuration(uint256 duration_) external;
@@ -275,6 +286,9 @@ interface ICredentialRegistry {
     /// @notice Removes a trusted attestation verifier.
     /// @param verifier_ The verifier address to remove.
     function removeTrustedVerifier(address verifier_) external;
+
+    /// @notice Updates the registry-level default Merkle tree duration for new Semaphore groups.
+    /// @param duration_ New default Merkle tree duration in seconds.
     function setDefaultMerkleTreeDuration(uint256 duration_) external;
 
     // ── App management ──────────────────────────
@@ -314,5 +328,9 @@ interface ICredentialRegistry {
     /// @param appId_ The app ID.
     /// @param scorer_ The scorer contract address.
     function setAppScorer(uint256 appId_, address scorer_) external;
+
+    /// @notice Sets a per-app Merkle tree duration override and propagates to all existing groups.
+    /// @param appId_ The app ID to configure.
+    /// @param merkleTreeDuration_ The Merkle tree duration in seconds.
     function setAppMerkleTreeDuration(uint256 appId_, uint256 merkleTreeDuration_) external;
 }
