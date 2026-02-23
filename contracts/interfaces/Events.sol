@@ -136,6 +136,10 @@ event AttestationValidityDurationSet(uint256 duration);
 /// @param status The new credential group status.
 event CredentialGroupStatusChanged(uint256 indexed credentialGroupId, ICredentialRegistry.CredentialGroupStatus status);
 
+/// @notice Emitted when the future attestation buffer is updated.
+/// @param buffer The new buffer duration in seconds.
+event FutureAttestationBufferSet(uint256 buffer);
+
 /// @notice Emitted when the registry-level default Merkle tree duration is updated.
 /// @param duration The new default duration in seconds.
 event DefaultMerkleTreeDurationSet(uint256 indexed duration);

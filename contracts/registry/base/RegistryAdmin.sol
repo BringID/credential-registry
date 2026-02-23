@@ -72,6 +72,13 @@ abstract contract RegistryAdmin is RegistryStorage {
         emit AttestationValidityDurationSet(duration_);
     }
 
+    /// @notice Updates the forward-tolerance buffer for future attestation timestamps.
+    /// @param buffer_ New buffer in seconds (0 to disable tolerance).
+    function setFutureAttestationBuffer(uint256 buffer_) public onlyOwner {
+        futureAttestationBuffer = buffer_;
+        emit FutureAttestationBufferSet(buffer_);
+    }
+
     /// @notice Updates the registry-level default Merkle tree duration for new Semaphore groups.
     /// @dev Does not propagate to existing groups. Only affects groups created after this call.
     /// @param duration_ New duration in seconds (must be > 0).

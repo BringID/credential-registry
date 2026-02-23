@@ -30,7 +30,7 @@ abstract contract AttestationVerifier is RegistryStorage {
         if (apps[attestation_.appId].status != AppStatus.ACTIVE) revert AppNotActive();
         if (attestation_.registry != address(this)) revert WrongRegistryAddress();
         if (attestation_.chainId != block.chainid) revert WrongChain();
-        if (attestation_.issuedAt > block.timestamp) revert FutureAttestation();
+        if (attestation_.issuedAt > block.timestamp + futureAttestationBuffer) revert FutureAttestation();
         if (block.timestamp > attestation_.issuedAt + attestationValidityDuration) revert AttestationExpired();
 
         signer = keccak256(abi.encode(attestation_)).toEthSignedMessageHash().recover(v, r, s);
