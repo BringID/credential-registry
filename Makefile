@@ -29,6 +29,17 @@ test-zkbring:
 test-idcard:
 	forge test --match-path "test/IdCard.t.sol" --ffi -v
 
+# Build deployment artifacts (via_ir=true contracts + ci scripts)
+# Run on VPS, commit deploy-artifacts.tar.gz, then deploy locally with --prebuilt
+build-deploy-artifacts:
+	@echo "Building scripts (ci profile)..."
+	FOUNDRY_PROFILE=ci forge build --skip test
+	@echo "Building contracts (via_ir=true)..."
+	FOUNDRY_PROFILE=default forge build --skip test --skip script
+	@echo "Packaging artifacts..."
+	tar -czf deploy-artifacts.tar.gz out/
+	@echo "✓ deploy-artifacts.tar.gz created ($(du -h deploy-artifacts.tar.gz | cut -f1))"
+
 # Deploy commands
 deploy-local:
 	forge script \

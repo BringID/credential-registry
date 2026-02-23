@@ -15,6 +15,9 @@ set -euo pipefail
 #   --skip-apps               Skip app registration
 #   --skip-scorer-factory     Skip ScorerFactory deployment
 #   --dry-run                 Simulate without broadcasting (no --broadcast flag)
+#   --prebuilt                Skip compilation; use pre-built artifacts from out/
+#                             (build on VPS with `make build-deploy-artifacts`, commit
+#                             deploy-artifacts.tar.gz, then extract locally before deploying)
 #
 # Required env vars (in .env):
 #   PRIVATE_KEY       — Deployer private key (hex, without 0x prefix)
@@ -38,6 +41,7 @@ SKIP_CREDENTIAL_GROUPS=false
 SKIP_APPS=false
 SKIP_SCORER_FACTORY=false
 DRY_RUN=false
+PREBUILT=false
 
 for arg in "$@"; do
   case "$arg" in
@@ -56,9 +60,12 @@ for arg in "$@"; do
     --dry-run)
       DRY_RUN=true
       ;;
+    --prebuilt)
+      PREBUILT=true
+      ;;
     *)
       echo -e "${RED}Unknown argument: $arg${NC}"
-      echo "Usage: ./script/deploy.sh <sepolia|mainnet> [--skip-credential-groups] [--skip-apps] [--skip-scorer-factory] [--dry-run]"
+      echo "Usage: ./script/deploy.sh <sepolia|mainnet> [--skip-credential-groups] [--skip-apps] [--skip-scorer-factory] [--dry-run] [--prebuilt]"
       exit 1
       ;;
   esac
@@ -66,7 +73,7 @@ done
 
 if [[ -z "$NETWORK" ]]; then
   echo -e "${RED}Error: Network argument required${NC}"
-  echo "Usage: ./script/deploy.sh <sepolia|mainnet> [--skip-credential-groups] [--skip-apps] [--skip-scorer-factory] [--dry-run]"
+  echo "Usage: ./script/deploy.sh <sepolia|mainnet> [--skip-credential-groups] [--skip-apps] [--skip-scorer-factory] [--dry-run] [--prebuilt]"
   exit 1
 fi
 
@@ -142,13 +149,28 @@ if [[ "$DRY_RUN" == true ]]; then
   echo -e "${YELLOW}DRY RUN mode — no transactions will be broadcast${NC}"
 fi
 
+# ── Prebuilt artifacts ───────────────────────────────────────────────────────
+SKIP_COMPILATION_FLAG=""
+if [[ "$PREBUILT" == true ]]; then
+  TARBALL="$PROJECT_DIR/deploy-artifacts.tar.gz"
+  if [[ ! -f "$TARBALL" ]]; then
+    echo -e "${RED}Error: --prebuilt requires deploy-artifacts.tar.gz in project root${NC}"
+    echo "Build on VPS first:  make build-deploy-artifacts"
+    exit 1
+  fi
+  echo -e "${CYAN}Extracting pre-built artifacts from deploy-artifacts.tar.gz${NC}"
+  tar -xzf "$TARBALL" -C "$PROJECT_DIR"
+  SKIP_COMPILATION_FLAG="--skip-compilation"
+  echo -e "${GREEN}✓ Pre-built artifacts extracted${NC}"
+fi
+
 # ── Foundry profile for forge script calls ───────────────────────────────────
-# Always use ci profile (via_ir=false) for fast script compilation/execution.
-# Step 1 pre-builds contract artifacts with via_ir=true (default profile).
-# forge script uses ci profile for speed — the deployed bytecode comes from
-# the ci build. If you need BaseScan-verifiable bytecode (via_ir=true match),
-# run `forge verify-contract` separately after deployment using the default profile.
-FORGE_PROFILE="ci"
+# Use default profile (via_ir=true) so forge script deploys the same optimized
+# bytecode that Step 1 compiles. This ensures deployed contracts match the
+# verified source on BaseScan without needing a separate verify-contract step.
+# When --prebuilt is used, compilation is skipped entirely so the profile only
+# affects non-compilation aspects of forge script.
+FORGE_PROFILE="default"
 
 # ── Pre-flight checks ────────────────────────────────────────────────────────
 echo ""
@@ -206,7 +228,7 @@ echo -e "  Trusted Verifier:  ${CYAN}$TRUSTED_VERIFIER${NC}"
 echo -e "  Explorer:          ${CYAN}$EXPLORER_URL${NC}"
 echo ""
 echo -e "  Steps:"
-echo -e "    1. Compile contracts (via_ir=true)"
+[[ "$PREBUILT" == false ]] && echo -e "    1. Compile contracts (via_ir=true)" || echo -e "    1. ${GREEN}[PREBUILT]${NC} Using pre-built via_ir=true artifacts"
 echo -e "    2. Deploy CredentialRegistry + DefaultScorer"
 [[ "$SKIP_CREDENTIAL_GROUPS" == false ]] && echo -e "    3. Create credential groups + set scores" || echo -e "    3. ${YELLOW}[SKIP]${NC} Create credential groups + set scores"
 [[ "$SKIP_APPS" == false ]] && echo -e "    4. Register apps" || echo -e "    4. ${YELLOW}[SKIP]${NC} Register apps"
@@ -230,13 +252,17 @@ echo ""
 # ══════════════════════════════════════════════════════════════════════════════
 # Step 1: Compile contracts
 # ══════════════════════════════════════════════════════════════════════════════
-echo -e "${BOLD}Step 1/5: Compiling contracts (via_ir=true)${NC}"
-echo -e "${YELLOW}Note: via_ir compilation may be slow and use significant memory${NC}"
-echo "─────────────────────────────────────────"
+if [[ "$PREBUILT" == true ]]; then
+  echo -e "${GREEN}Step 1/5: Using pre-built artifacts (--prebuilt)${NC}"
+else
+  echo -e "${BOLD}Step 1/5: Compiling contracts (via_ir=true)${NC}"
+  echo -e "${YELLOW}Note: via_ir compilation may be slow and use significant memory${NC}"
+  echo "─────────────────────────────────────────"
 
-FOUNDRY_PROFILE=default forge build --skip test --skip script
+  FOUNDRY_PROFILE=default forge build --skip test --skip script
 
-echo -e "${GREEN}✓ Compilation successful${NC}"
+  echo -e "${GREEN}✓ Compilation successful${NC}"
+fi
 echo ""
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -252,6 +278,7 @@ FOUNDRY_PROFILE="$FORGE_PROFILE" \
   --rpc-url "$RPC_URL" \
   $BROADCAST_FLAG \
   $VERIFY_FLAGS \
+  $SKIP_COMPILATION_FLAG \
   -v
 
 echo ""
@@ -314,6 +341,7 @@ else
     --rpc-url "$RPC_URL" \
     $BROADCAST_FLAG \
     $VERIFY_FLAGS \
+    $SKIP_COMPILATION_FLAG \
     -v
 
   echo -e "${GREEN}✓ Credential groups created and scores set${NC}"
@@ -338,6 +366,7 @@ else
     --rpc-url "$RPC_URL" \
     $BROADCAST_FLAG \
     $VERIFY_FLAGS \
+    $SKIP_COMPILATION_FLAG \
     -v
 
   echo -e "${GREEN}✓ Apps registered${NC}"
@@ -358,6 +387,7 @@ else
     --rpc-url "$RPC_URL" \
     $BROADCAST_FLAG \
     $VERIFY_FLAGS \
+    $SKIP_COMPILATION_FLAG \
     -v
 
   echo -e "${GREEN}✓ ScorerFactory deployed${NC}"
