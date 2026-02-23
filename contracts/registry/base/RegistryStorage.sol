@@ -46,6 +46,11 @@ abstract contract RegistryStorage is ICredentialRegistry, Ownable2Step, Pausable
     /// @notice Maximum age (in seconds) an attestation is accepted. Default 30 minutes.
     uint256 public attestationValidityDuration = 30 minutes;
 
+    /// @notice Forward-tolerance buffer (in seconds) for attestation issuedAt timestamps.
+    /// On L2s a sequencer's block.timestamp can lag behind real-world time,
+    /// causing valid attestations to be rejected as "future". Default 10 minutes.
+    uint256 public futureAttestationBuffer = 10 minutes;
+
     /// @notice Array of all registered credential group IDs (for enumeration).
     uint256[] public credentialGroupIds;
 

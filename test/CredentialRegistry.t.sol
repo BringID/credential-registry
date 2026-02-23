@@ -1938,6 +1938,7 @@ contract CredentialRegistryTest is Test {
         bytes32 credentialId = keccak256("blinded-id");
         uint256 commitment = COMMITMENT_12345;
 
+        // issuedAt exceeds the 10-minute buffer
         ICredentialRegistry.Attestation memory att = ICredentialRegistry.Attestation({
             registry: address(registry),
             chainId: block.chainid,
@@ -1951,6 +1952,71 @@ contract CredentialRegistryTest is Test {
 
         vm.expectRevert(FutureAttestation.selector);
         registry.registerCredential(att, v, r, s);
+    }
+
+    function testRegisterCredentialFutureAttestationWithinBuffer() public {
+        uint256 credentialGroupId = 1;
+        registry.createCredentialGroup(credentialGroupId, 0, 0);
+
+        bytes32 credentialId = keccak256("blinded-id");
+        uint256 commitment = COMMITMENT_12345;
+
+        // issuedAt is 5 minutes ahead, within the 10-minute default buffer
+        ICredentialRegistry.Attestation memory att = ICredentialRegistry.Attestation({
+            registry: address(registry),
+            chainId: block.chainid,
+            credentialGroupId: credentialGroupId,
+            credentialId: credentialId,
+            appId: DEFAULT_APP_ID,
+            semaphoreIdentityCommitment: commitment,
+            issuedAt: block.timestamp + 5 minutes
+        });
+        (uint8 v, bytes32 r, bytes32 s) = _signAttestation(att);
+
+        registry.registerCredential(att, v, r, s);
+    }
+
+    function testRegisterCredentialFutureAttestationBufferZero() public {
+        // Disable the buffer
+        registry.setFutureAttestationBuffer(0);
+
+        uint256 credentialGroupId = 1;
+        registry.createCredentialGroup(credentialGroupId, 0, 0);
+
+        bytes32 credentialId = keccak256("blinded-id");
+        uint256 commitment = COMMITMENT_12345;
+
+        // Even 1 second ahead should revert with buffer=0
+        ICredentialRegistry.Attestation memory att = ICredentialRegistry.Attestation({
+            registry: address(registry),
+            chainId: block.chainid,
+            credentialGroupId: credentialGroupId,
+            credentialId: credentialId,
+            appId: DEFAULT_APP_ID,
+            semaphoreIdentityCommitment: commitment,
+            issuedAt: block.timestamp + 1
+        });
+        (uint8 v, bytes32 r, bytes32 s) = _signAttestation(att);
+
+        vm.expectRevert(FutureAttestation.selector);
+        registry.registerCredential(att, v, r, s);
+    }
+
+    function testSetFutureAttestationBuffer() public {
+        assertEq(registry.futureAttestationBuffer(), 10 minutes);
+
+        vm.expectEmit(false, false, false, true);
+        emit FutureAttestationBufferSet(5 minutes);
+
+        registry.setFutureAttestationBuffer(5 minutes);
+        assertEq(registry.futureAttestationBuffer(), 5 minutes);
+    }
+
+    function testSetFutureAttestationBufferOnlyOwner() public {
+        address notOwner = makeAddr("not-owner");
+        vm.prank(notOwner);
+        vm.expectRevert("Ownable: caller is not the owner");
+        registry.setFutureAttestationBuffer(5 minutes);
     }
 
     function testRegisterCredentialExpiredAttestation() public {
