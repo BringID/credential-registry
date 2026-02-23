@@ -47,7 +47,7 @@ abstract contract RegistryStorage is ICredentialRegistry, Ownable2Step, Pausable
     uint256 public attestationValidityDuration = 30 minutes;
 
     /// @notice Forward-tolerance buffer (in seconds) for attestation issuedAt timestamps.
-    /// On L2s like Base, the sequencer's block.timestamp can lag behind real-world time,
+    /// On L2s a sequencer's block.timestamp can lag behind real-world time,
     /// causing valid attestations to be rejected as "future". Default 10 minutes.
     uint256 public futureAttestationBuffer = 10 minutes;
 
