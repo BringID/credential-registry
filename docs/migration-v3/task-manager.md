@@ -12,7 +12,7 @@ The Task Manager accepts, schedules, and batches verification/claim tasks before
 
 ```diff
 - REGISTRY_ADDRESS=0xfd600B14Dc5A145ec9293Fd5768ae10Ccc1E91Fe
-+ REGISTRY_ADDRESS=0xbF9b2556e6Dd64D60E08E3669CeF2a4293e006db
++ REGISTRY_ADDRESS=0x17a22f130d4e1c4ba5C20a679a5a29F227083A62
 ```
 
 ### 2. Attestation Struct — `chainId` Field in Calldata (CRITICAL)

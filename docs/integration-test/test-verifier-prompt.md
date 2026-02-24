@@ -45,7 +45,7 @@ const signature = await wallet.signMessage(ethers.getBytes(hash));
 const body = {
   message: message,
   signature: signature,
-  registry: "0xbF9b2556e6Dd64D60E08E3669CeF2a4293e006db",
+  registry: "0x17a22f130d4e1c4ba5C20a679a5a29F227083A62",
   chain_id: "84532",          // Base Sepolia
   credential_group_id: "5",   // github.com, min score 30
   app_id: "1",
@@ -66,7 +66,7 @@ The response should be:
 ```json
 {
   "attestation": {
-    "registry": "0xbf9b2556e6dd64d60e08e3669cef2a4293e006db",
+    "registry": "0x17a22f130d4e1c4ba5c20a679a5a29f227083a62",
     "chain_id": 84532,
     "credential_group_id": "...",
     "credential_id": "0x...",

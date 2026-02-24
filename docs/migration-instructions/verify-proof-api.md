@@ -96,8 +96,8 @@ Contract addresses are identical on both chains (same deployer, same nonce).
 ```diff
   export const chainRegistries: Record<number, string[]> = {
 -   84532: ['0x0b2Ab187a6FD2d2F05fACc158611838c284E3a9c'],
-+   84532: ['0xbF9b2556e6Dd64D60E08E3669CeF2a4293e006db'],
-+   8453: ['0xbF9b2556e6Dd64D60E08E3669CeF2a4293e006db'],
++   84532: ['0x17a22f130d4e1c4ba5C20a679a5a29F227083A62'],
++   8453: ['0x17a22f130d4e1c4ba5C20a679a5a29F227083A62'],
   }
 ```
 
