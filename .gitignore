@@ -1,7 +1,6 @@
 # Compiler files
 cache/
 out/
-!deploy-artifacts.tar.gz
 
 # Broadcast logs
 broadcast/

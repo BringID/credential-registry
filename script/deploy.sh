@@ -15,9 +15,14 @@ set -euo pipefail
 #   --skip-apps               Skip app registration
 #   --skip-scorer-factory     Skip ScorerFactory deployment
 #   --dry-run                 Simulate without broadcasting (no --broadcast flag)
-#   --prebuilt                Skip compilation; use pre-built artifacts from out/
-#                             (build on VPS with `make build-deploy-artifacts`, commit
-#                             deploy-artifacts.tar.gz, then extract locally before deploying)
+#
+# Build strategy:
+#   Step 1 uses a two-step build to keep peak memory low (~1.2 GB):
+#     1a. Scripts compiled with ci profile (via_ir=false) — fast, low memory
+#     1b. Contracts compiled with default profile (via_ir=true) — optimized bytecode
+#   Steps 2 & 5 deploy contracts using `cast send --create` with pre-built
+#   bytecode from out/, avoiding any recompilation by forge.
+#   Steps 3 & 4 use `forge script` with ci profile (scripts already compiled).
 #
 # Required env vars (in .env):
 #   PRIVATE_KEY       — Deployer private key (hex, without 0x prefix)
@@ -41,7 +46,6 @@ SKIP_CREDENTIAL_GROUPS=false
 SKIP_APPS=false
 SKIP_SCORER_FACTORY=false
 DRY_RUN=false
-PREBUILT=false
 
 for arg in "$@"; do
   case "$arg" in
@@ -60,12 +64,9 @@ for arg in "$@"; do
     --dry-run)
       DRY_RUN=true
       ;;
-    --prebuilt)
-      PREBUILT=true
-      ;;
     *)
       echo -e "${RED}Unknown argument: $arg${NC}"
-      echo "Usage: ./script/deploy.sh <sepolia|mainnet> [--skip-credential-groups] [--skip-apps] [--skip-scorer-factory] [--dry-run] [--prebuilt]"
+      echo "Usage: ./script/deploy.sh <sepolia|mainnet> [--skip-credential-groups] [--skip-apps] [--skip-scorer-factory] [--dry-run]"
       exit 1
       ;;
   esac
@@ -73,7 +74,7 @@ done
 
 if [[ -z "$NETWORK" ]]; then
   echo -e "${RED}Error: Network argument required${NC}"
-  echo "Usage: ./script/deploy.sh <sepolia|mainnet> [--skip-credential-groups] [--skip-apps] [--skip-scorer-factory] [--dry-run] [--prebuilt]"
+  echo "Usage: ./script/deploy.sh <sepolia|mainnet> [--skip-credential-groups] [--skip-apps] [--skip-scorer-factory] [--dry-run]"
   exit 1
 fi
 
@@ -149,29 +150,6 @@ if [[ "$DRY_RUN" == true ]]; then
   echo -e "${YELLOW}DRY RUN mode — no transactions will be broadcast${NC}"
 fi
 
-# ── Prebuilt artifacts ───────────────────────────────────────────────────────
-SKIP_COMPILATION_FLAG=""
-if [[ "$PREBUILT" == true ]]; then
-  TARBALL="$PROJECT_DIR/deploy-artifacts.tar.gz"
-  if [[ ! -f "$TARBALL" ]]; then
-    echo -e "${RED}Error: --prebuilt requires deploy-artifacts.tar.gz in project root${NC}"
-    echo "Build on VPS first:  make build-deploy-artifacts"
-    exit 1
-  fi
-  echo -e "${CYAN}Extracting pre-built artifacts from deploy-artifacts.tar.gz${NC}"
-  tar -xzf "$TARBALL" -C "$PROJECT_DIR"
-  SKIP_COMPILATION_FLAG="--skip-compilation"
-  echo -e "${GREEN}✓ Pre-built artifacts extracted${NC}"
-fi
-
-# ── Foundry profile for forge script calls ───────────────────────────────────
-# Use default profile (via_ir=true) so forge script deploys the same optimized
-# bytecode that Step 1 compiles. This ensures deployed contracts match the
-# verified source on BaseScan without needing a separate verify-contract step.
-# When --prebuilt is used, compilation is skipped entirely so the profile only
-# affects non-compilation aspects of forge script.
-FORGE_PROFILE="default"
-
 # ── Pre-flight checks ────────────────────────────────────────────────────────
 echo ""
 echo -e "${BOLD}Pre-flight checks${NC}"
@@ -228,7 +206,7 @@ echo -e "  Trusted Verifier:  ${CYAN}$TRUSTED_VERIFIER${NC}"
 echo -e "  Explorer:          ${CYAN}$EXPLORER_URL${NC}"
 echo ""
 echo -e "  Steps:"
-[[ "$PREBUILT" == false ]] && echo -e "    1. Compile contracts (via_ir=true)" || echo -e "    1. ${GREEN}[PREBUILT]${NC} Using pre-built via_ir=true artifacts"
+echo -e "    1. Compile contracts (via_ir=true)"
 echo -e "    2. Deploy CredentialRegistry + DefaultScorer"
 [[ "$SKIP_CREDENTIAL_GROUPS" == false ]] && echo -e "    3. Create credential groups + set scores" || echo -e "    3. ${YELLOW}[SKIP]${NC} Create credential groups + set scores"
 [[ "$SKIP_APPS" == false ]] && echo -e "    4. Register apps" || echo -e "    4. ${YELLOW}[SKIP]${NC} Register apps"
@@ -250,82 +228,84 @@ fi
 echo ""
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Step 1: Compile contracts
+# Step 1: Compile contracts (two-step to reduce peak memory)
+#   1a. Scripts with ci profile (via_ir=false) — fast, low memory
+#   1b. Contracts with default profile (via_ir=true) — ~1.2 GB peak
 # ══════════════════════════════════════════════════════════════════════════════
-if [[ "$PREBUILT" == true ]]; then
-  echo -e "${GREEN}Step 1/5: Using pre-built artifacts (--prebuilt)${NC}"
-else
-  echo -e "${BOLD}Step 1/5: Compiling contracts (via_ir=true)${NC}"
-  echo -e "${YELLOW}Note: via_ir compilation may be slow and use significant memory${NC}"
-  echo "─────────────────────────────────────────"
+echo -e "${BOLD}Step 1/5: Compiling contracts${NC}"
+echo "─────────────────────────────────────────"
 
-  FOUNDRY_PROFILE=default forge build --skip test --skip script
+echo -e "  Building scripts (ci profile, via_ir=false)..."
+FOUNDRY_PROFILE=ci forge build --skip test
 
-  echo -e "${GREEN}✓ Compilation successful${NC}"
+echo -e "  Building contracts (default profile, via_ir=true)..."
+FOUNDRY_PROFILE=default forge build --skip test --skip script
+
+echo -e "${GREEN}✓ Compilation successful${NC}"
+
+# Extract all bytecodes now, before forge script (steps 3-4) can overwrite out/
+echo -e "  Extracting via_ir bytecodes from out/..."
+REGISTRY_BYTECODE=$(jq -r '.bytecode.object' "$PROJECT_DIR/out/CredentialRegistry.sol/CredentialRegistry.json")
+if [[ -z "$REGISTRY_BYTECODE" || "$REGISTRY_BYTECODE" == "null" ]]; then
+  echo -e "${RED}Error: Could not extract CredentialRegistry bytecode from out/${NC}"
+  exit 1
 fi
+FACTORY_BYTECODE=$(jq -r '.bytecode.object' "$PROJECT_DIR/out/ScorerFactory.sol/ScorerFactory.json")
+if [[ -z "$FACTORY_BYTECODE" || "$FACTORY_BYTECODE" == "null" ]]; then
+  echo -e "${RED}Error: Could not extract ScorerFactory bytecode from out/${NC}"
+  exit 1
+fi
+echo -e "${GREEN}✓ Bytecodes extracted${NC}"
 echo ""
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Step 2: Deploy CredentialRegistry (+ DefaultScorer via constructor)
+#   Uses `cast send --create` with pre-built bytecode to avoid recompilation.
+#   Constructor: CredentialRegistry(ISemaphore, address trustedVerifier, uint256 defaultMerkleTreeDuration)
 # ══════════════════════════════════════════════════════════════════════════════
 echo -e "${BOLD}Step 2/5: Deploying CredentialRegistry${NC}"
 echo "─────────────────────────────────────────"
 
-SEMAPHORE_ADDRESS="$SEMAPHORE_ADDRESS" \
-TRUSTED_VERIFIER="$TRUSTED_VERIFIER" \
-FOUNDRY_PROFILE="$FORGE_PROFILE" \
-  forge script script/Deploy.s.sol:Deploy \
-  --rpc-url "$RPC_URL" \
-  $BROADCAST_FLAG \
-  $VERIFY_FLAGS \
-  $SKIP_COMPILATION_FLAG \
-  -v
-
-echo ""
-
-# Extract addresses from broadcast JSON
-REGISTRY_ADDRESS=""
-DEFAULT_SCORER_ADDRESS=""
-
-BROADCAST_FILE="$PROJECT_DIR/broadcast/Deploy.s.sol/$CHAIN_ID/run-latest.json"
+# Encode constructor args: (address semaphore, address trustedVerifier, uint256 defaultMerkleTreeDuration)
+# defaultMerkleTreeDuration = 5 minutes = 300 seconds
+CONSTRUCTOR_ARGS=$(cast abi-encode "constructor(address,address,uint256)" "$SEMAPHORE_ADDRESS" "$TRUSTED_VERIFIER" 300)
 
 if [[ "$DRY_RUN" == true ]]; then
-  # In dry-run mode, try to extract from dry-run broadcast
-  BROADCAST_FILE="$PROJECT_DIR/broadcast/Deploy.s.sol/$CHAIN_ID/dry-run/run-latest.json"
-fi
+  echo -e "${YELLOW}  [DRY RUN] Would deploy CredentialRegistry with:${NC}"
+  echo -e "    Semaphore:       $SEMAPHORE_ADDRESS"
+  echo -e "    TrustedVerifier: $TRUSTED_VERIFIER"
+  echo -e "    MerkleTreeDur:   300 (5 minutes)"
+  echo -e "    Bytecode size:   $((${#REGISTRY_BYTECODE} / 2)) bytes"
+  REGISTRY_ADDRESS="0xDRY_RUN_REGISTRY_ADDRESS"
+  DEFAULT_SCORER_ADDRESS="0xDRY_RUN_SCORER_ADDRESS"
+else
+  echo -e "  Deploying CredentialRegistry..."
+  DEPLOY_OUTPUT=$(cast send \
+    --private-key "$PRIVATE_KEY" \
+    --rpc-url "$RPC_URL" \
+    --json \
+    --create "${REGISTRY_BYTECODE}${CONSTRUCTOR_ARGS#0x}")
 
-if [[ -f "$BROADCAST_FILE" ]]; then
-  # Extract CredentialRegistry address — it's a CREATE transaction
-  REGISTRY_ADDRESS=$(jq -r '.transactions[] | select(.transactionType == "CREATE" and .contractName == "CredentialRegistry") | .contractAddress' "$BROADCAST_FILE" | head -1)
-
-  # Extract DefaultScorer address from additionalContracts (deployed by CredentialRegistry constructor)
-  DEFAULT_SCORER_ADDRESS=$(jq -r '.transactions[] | select(.contractName == "CredentialRegistry") | .additionalContracts[]? | select(.contractName == "DefaultScorer") | .address' "$BROADCAST_FILE" | head -1)
-
-  # Fallback: query on-chain if not found in broadcast JSON (won't work in dry-run)
-  if [[ (-z "$DEFAULT_SCORER_ADDRESS" || "$DEFAULT_SCORER_ADDRESS" == "null") && -n "$REGISTRY_ADDRESS" && "$REGISTRY_ADDRESS" != "null" && "$DRY_RUN" == false ]]; then
-    DEFAULT_SCORER_ADDRESS=$(cast call "$REGISTRY_ADDRESS" "defaultScorer()(address)" --rpc-url "$RPC_URL" 2>/dev/null || true)
+  REGISTRY_ADDRESS=$(echo "$DEPLOY_OUTPUT" | jq -r '.contractAddress')
+  if [[ -z "$REGISTRY_ADDRESS" || "$REGISTRY_ADDRESS" == "null" ]]; then
+    echo -e "${RED}Error: CredentialRegistry deployment failed${NC}"
+    echo "$DEPLOY_OUTPUT"
+    exit 1
   fi
-fi
 
-# Fallback: try to parse from forge script console output if broadcast JSON extraction failed
-if [[ -z "$REGISTRY_ADDRESS" || "$REGISTRY_ADDRESS" == "null" ]]; then
-  echo -e "${YELLOW}Warning: Could not extract addresses from broadcast JSON${NC}"
-  echo -e "${YELLOW}Please enter the deployed addresses manually:${NC}"
-  read -r -p "  CredentialRegistry address: " REGISTRY_ADDRESS
-  read -r -p "  DefaultScorer address: " DEFAULT_SCORER_ADDRESS
-fi
-
-if [[ -z "$REGISTRY_ADDRESS" || "$REGISTRY_ADDRESS" == "null" ]]; then
-  echo -e "${RED}Error: Could not determine CredentialRegistry address${NC}"
-  exit 1
+  # Query DefaultScorer address (deployed by constructor)
+  # Wait briefly for the transaction to be indexed
+  sleep 2
+  DEFAULT_SCORER_ADDRESS=$(cast call "$REGISTRY_ADDRESS" "defaultScorer()(address)" --rpc-url "$RPC_URL" 2>/dev/null | tr -d '[:space:]' || true)
 fi
 
 echo -e "${GREEN}✓ CredentialRegistry deployed: ${CYAN}$REGISTRY_ADDRESS${NC}"
-echo -e "${GREEN}✓ DefaultScorer deployed:      ${CYAN}$DEFAULT_SCORER_ADDRESS${NC}"
+echo -e "${GREEN}✓ DefaultScorer deployed:      ${CYAN}${DEFAULT_SCORER_ADDRESS:-N/A}${NC}"
 echo ""
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Step 3: Create credential groups + set scores
+#   Uses forge script with ci profile (scripts already compiled, no recompilation).
 # ══════════════════════════════════════════════════════════════════════════════
 if [[ "$SKIP_CREDENTIAL_GROUPS" == true ]]; then
   echo -e "${YELLOW}Step 3/5: Skipping credential groups (--skip-credential-groups)${NC}"
@@ -336,12 +316,11 @@ else
   echo "─────────────────────────────────────────"
 
   CREDENTIAL_REGISTRY_ADDRESS="$REGISTRY_ADDRESS" \
-  FOUNDRY_PROFILE="$FORGE_PROFILE" \
+  FOUNDRY_PROFILE="ci" \
     forge script script/CredentialGroups.s.sol:DeployCredentialGroups \
     --rpc-url "$RPC_URL" \
     $BROADCAST_FLAG \
     $VERIFY_FLAGS \
-    $SKIP_COMPILATION_FLAG \
     -v
 
   echo -e "${GREEN}✓ Credential groups created and scores set${NC}"
@@ -350,6 +329,7 @@ echo ""
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Step 4: Register apps
+#   Uses forge script with ci profile (scripts already compiled, no recompilation).
 # ══════════════════════════════════════════════════════════════════════════════
 if [[ "$SKIP_APPS" == true ]]; then
   echo -e "${YELLOW}Step 4/5: Skipping app registration (--skip-apps)${NC}"
@@ -361,20 +341,32 @@ else
   echo "─────────────────────────────────────────"
 
   CREDENTIAL_REGISTRY_ADDRESS="$REGISTRY_ADDRESS" \
-  FOUNDRY_PROFILE="$FORGE_PROFILE" \
+  FOUNDRY_PROFILE="ci" \
     forge script script/RegisterApps.s.sol:RegisterApps \
     --rpc-url "$RPC_URL" \
     $BROADCAST_FLAG \
     $VERIFY_FLAGS \
-    $SKIP_COMPILATION_FLAG \
     -v
 
   echo -e "${GREEN}✓ Apps registered${NC}"
 fi
 echo ""
 
+# ── Rebuild via_ir artifacts ──────────────────────────────────────────────────
+# Steps 3-4 ran forge script with ci profile which overwrites out/ with
+# via_ir=false artifacts. Rebuild so out/ contains the correct via_ir=true
+# artifacts for BaseScan verification.
+if [[ "$SKIP_CREDENTIAL_GROUPS" == false || "$SKIP_APPS" == false ]] && [[ "$DRY_RUN" == false ]]; then
+  echo -e "  Rebuilding via_ir=true artifacts for verification..."
+  FOUNDRY_PROFILE=default forge build --skip test --skip script --quiet
+  echo -e "${GREEN}✓ via_ir=true artifacts restored in out/${NC}"
+  echo ""
+fi
+
 # ══════════════════════════════════════════════════════════════════════════════
 # Step 5: Deploy ScorerFactory
+#   Uses `cast send --create` with pre-built bytecode to avoid recompilation.
+#   ScorerFactory has no constructor arguments.
 # ══════════════════════════════════════════════════════════════════════════════
 if [[ "$SKIP_SCORER_FACTORY" == true ]]; then
   echo -e "${YELLOW}Step 5/5: Skipping ScorerFactory (--skip-scorer-factory)${NC}"
@@ -382,29 +374,29 @@ else
   echo -e "${BOLD}Step 5/5: Deploying ScorerFactory${NC}"
   echo "─────────────────────────────────────────"
 
-  FOUNDRY_PROFILE="$FORGE_PROFILE" \
-    forge script script/DeployScorerFactory.s.sol:DeployScorerFactory \
-    --rpc-url "$RPC_URL" \
-    $BROADCAST_FLAG \
-    $VERIFY_FLAGS \
-    $SKIP_COMPILATION_FLAG \
-    -v
+  if [[ "$DRY_RUN" == true ]]; then
+    echo -e "${YELLOW}  [DRY RUN] Would deploy ScorerFactory${NC}"
+    echo -e "    Bytecode size: $((${#FACTORY_BYTECODE} / 2)) bytes"
+    SCORER_FACTORY_ADDRESS="0xDRY_RUN_FACTORY_ADDRESS"
+  else
+    echo -e "  Deploying ScorerFactory..."
+    SF_OUTPUT=$(cast send \
+      --private-key "$PRIVATE_KEY" \
+      --rpc-url "$RPC_URL" \
+      --json \
+      --create "$FACTORY_BYTECODE")
 
-  echo -e "${GREEN}✓ ScorerFactory deployed${NC}"
+    SCORER_FACTORY_ADDRESS=$(echo "$SF_OUTPUT" | jq -r '.contractAddress')
+    if [[ -z "$SCORER_FACTORY_ADDRESS" || "$SCORER_FACTORY_ADDRESS" == "null" ]]; then
+      echo -e "${RED}Error: ScorerFactory deployment failed${NC}"
+      echo "$SF_OUTPUT"
+      exit 1
+    fi
+  fi
+
+  echo -e "${GREEN}✓ ScorerFactory deployed: ${CYAN}$SCORER_FACTORY_ADDRESS${NC}"
 fi
 echo ""
-
-# ── Extract ScorerFactory address ─────────────────────────────────────────────
-SCORER_FACTORY_ADDRESS=""
-if [[ "$SKIP_SCORER_FACTORY" == false ]]; then
-  SF_BROADCAST="$PROJECT_DIR/broadcast/DeployScorerFactory.s.sol/$CHAIN_ID/run-latest.json"
-  if [[ "$DRY_RUN" == true ]]; then
-    SF_BROADCAST="$PROJECT_DIR/broadcast/DeployScorerFactory.s.sol/$CHAIN_ID/dry-run/run-latest.json"
-  fi
-  if [[ -f "$SF_BROADCAST" ]]; then
-    SCORER_FACTORY_ADDRESS=$(jq -r '.transactions[] | select(.transactionType == "CREATE" and .contractName == "ScorerFactory") | .contractAddress' "$SF_BROADCAST" | head -1)
-  fi
-fi
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Summary
@@ -418,7 +410,7 @@ echo -e "  ───────────────────────
 echo -e "  Semaphore:            ${CYAN}$SEMAPHORE_ADDRESS${NC}"
 echo -e "  CredentialRegistry:   ${CYAN}$REGISTRY_ADDRESS${NC}"
 echo -e "  DefaultScorer:        ${CYAN}${DEFAULT_SCORER_ADDRESS:-N/A}${NC}"
-[[ -n "$SCORER_FACTORY_ADDRESS" && "$SCORER_FACTORY_ADDRESS" != "null" ]] && \
+[[ -n "${SCORER_FACTORY_ADDRESS:-}" && "${SCORER_FACTORY_ADDRESS:-}" != "null" ]] && \
   echo -e "  ScorerFactory:        ${CYAN}$SCORER_FACTORY_ADDRESS${NC}"
 echo ""
 echo -e "  ${BOLD}Explorer Links${NC}"
@@ -426,7 +418,7 @@ echo -e "  ───────────────────────
 echo -e "  Registry:       ${CYAN}$EXPLORER_URL/address/$REGISTRY_ADDRESS${NC}"
 [[ -n "${DEFAULT_SCORER_ADDRESS:-}" && "$DEFAULT_SCORER_ADDRESS" != "null" ]] && \
   echo -e "  DefaultScorer:  ${CYAN}$EXPLORER_URL/address/$DEFAULT_SCORER_ADDRESS${NC}"
-[[ -n "$SCORER_FACTORY_ADDRESS" && "$SCORER_FACTORY_ADDRESS" != "null" ]] && \
+[[ -n "${SCORER_FACTORY_ADDRESS:-}" && "${SCORER_FACTORY_ADDRESS:-}" != "null" ]] && \
   echo -e "  ScorerFactory:  ${CYAN}$EXPLORER_URL/address/$SCORER_FACTORY_ADDRESS${NC}"
 echo ""
 echo -e "  ${BOLD}Verification Commands${NC}"
