@@ -14,7 +14,7 @@ A web dashboard for third-party app developers to self-manage their BringID inte
 
 All interactions go to two contracts on Base (mainnet 8453 / Sepolia 84532):
 
-### CredentialRegistry (`0xbF9b2556e6Dd64D60E08E3669CeF2a4293e006db`)
+### CredentialRegistry (`0x17a22f130d4e1c4ba5C20a679a5a29F227083A62`)
 
 | Function | Access | Description |
 |---|---|---|
@@ -31,7 +31,7 @@ All interactions go to two contracts on Base (mainnet 8453 / Sepolia 84532):
 | `credentialGroups(uint256 id)` | View | Returns `(status, validityDuration, familyId)`. |
 | `getCredentialGroupIds()` | View | Returns all registered credential group IDs. |
 
-### DefaultScorer (`0x315044578dd9480Dd25427E4a4d94b0fc2Fa4f8c`)
+### DefaultScorer (`0x6791B588dAdeb4323bc1C3d987130bC13cBe3625`)
 
 Read-only from the dashboard's perspective (only BringID owner can write):
 
@@ -41,7 +41,7 @@ Read-only from the dashboard's perspective (only BringID owner can write):
 | `getScores(uint256[] credentialGroupIds)` | View | Scores for multiple groups. |
 | `getAllScores()` | View | All group IDs + scores. |
 
-### ScorerFactory (`0xAa03996D720C162Fdff246E1D3CEecc792986750`)
+### ScorerFactory (`0x016bC46169533a8d3284c5D8DD590C91783C8C06`)
 
 Deploys DefaultScorer instances owned by the caller. Same address on both chains.
 

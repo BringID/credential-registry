@@ -52,11 +52,11 @@ make deploy-idcard        # IdCard contract to Base
 | Contract | Both Chains |
 |---|---|
 | Semaphore | `0x8A1fd199516489B0Fb7153EB5f075cDAC83c693D` |
-| CredentialRegistry | `0xbF9b2556e6Dd64D60E08E3669CeF2a4293e006db` |
-| DefaultScorer | `0x315044578dd9480Dd25427E4a4d94b0fc2Fa4f8c` |
-| ScorerFactory | `0xAa03996D720C162Fdff246E1D3CEecc792986750` |
+| CredentialRegistry | `0x17a22f130d4e1c4ba5C20a679a5a29F227083A62` |
+| DefaultScorer | `0x6791B588dAdeb4323bc1C3d987130bC13cBe3625` |
+| ScorerFactory | `0x016bC46169533a8d3284c5D8DD590C91783C8C06` |
 
-Owner: `0x6F0CDcd334BA91A5E221582665Cce0431aD4Fc0b`
+Owner: `0x677112864ED447866f8D461ABe284E5e907bB4F8`
 Trusted verifier (Sepolia): `0x3c50f7055D804b51e506Bc1EA7D082cB1548376C`
 Trusted verifier (mainnet): `0x9186aA65288bFfa67fB58255AeeaFfc4515535d9`
 

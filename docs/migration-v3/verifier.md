@@ -56,7 +56,7 @@ Update the `registry` field in all attestations to the new contract address:
 
 ```diff
 - registry: '0xfd600B14Dc5A145ec9293Fd5768ae10Ccc1E91Fe'
-+ registry: '0xbF9b2556e6Dd64D60E08E3669CeF2a4293e006db'
++ registry: '0x17a22f130d4e1c4ba5C20a679a5a29F227083A62'
 ```
 
 The contract enforces `attestation.registry == address(this)` and reverts with `WrongRegistryAddress()` on mismatch.
@@ -149,7 +149,7 @@ Update or add:
 
 ```diff
 - REGISTRY_ADDRESS=0xfd600B14Dc5A145ec9293Fd5768ae10Ccc1E91Fe
-+ REGISTRY_ADDRESS=0xbF9b2556e6Dd64D60E08E3669CeF2a4293e006db
++ REGISTRY_ADDRESS=0x17a22f130d4e1c4ba5C20a679a5a29F227083A62
 ```
 
 Ensure `CHAIN_ID` or equivalent config is available if the verifier serves multiple chains.
@@ -161,7 +161,7 @@ import { ethers } from 'ethers'
 
 const chainId = 84532 // Base Sepolia
 const attestation = {
-  registry: '0xbF9b2556e6Dd64D60E08E3669CeF2a4293e006db',
+  registry: '0x17a22f130d4e1c4ba5C20a679a5a29F227083A62',
   chainId,
   credentialGroupId,
   credentialId,

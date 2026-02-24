@@ -287,6 +287,10 @@ interface ICredentialRegistry {
     /// @param verifier_ The verifier address to remove.
     function removeTrustedVerifier(address verifier_) external;
 
+    /// @notice Updates the forward-tolerance buffer for future attestation timestamps.
+    /// @param buffer_ New buffer in seconds (0 to disable tolerance).
+    function setFutureAttestationBuffer(uint256 buffer_) external;
+
     /// @notice Updates the registry-level default Merkle tree duration for new Semaphore groups.
     /// @param duration_ New default Merkle tree duration in seconds.
     function setDefaultMerkleTreeDuration(uint256 duration_) external;
