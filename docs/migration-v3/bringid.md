@@ -12,13 +12,13 @@ Update all hardcoded or configured contract addresses:
 
 ```diff
 - CredentialRegistry: '0xfd600B14Dc5A145ec9293Fd5768ae10Ccc1E91Fe'
-+ CredentialRegistry: '0xbF9b2556e6Dd64D60E08E3669CeF2a4293e006db'
++ CredentialRegistry: '0x17a22f130d4e1c4ba5C20a679a5a29F227083A62'
 
 - DefaultScorer: '0x6a0b5ba649C7667A0C4Cd7FE8a83484AEE6C5345'
-+ DefaultScorer: '0x315044578dd9480Dd25427E4a4d94b0fc2Fa4f8c'
++ DefaultScorer: '0x6791B588dAdeb4323bc1C3d987130bC13cBe3625'
 
 - ScorerFactory: '0x05321FAAD6315a04d5024Ee5b175AB1C62a3fd44'
-+ ScorerFactory: '0xAa03996D720C162Fdff246E1D3CEecc792986750'
++ ScorerFactory: '0x016bC46169533a8d3284c5D8DD590C91783C8C06'
 ```
 
 Semaphore address is unchanged: `0x8A1fd199516489B0Fb7153EB5f075cDAC83c693D`.
@@ -155,7 +155,7 @@ Rename the proof type to match the contract:
 
 All apps must re-register on the new contract via `registerApp()`. Existing app IDs from the old contract are not valid on the new contract. Store the new `appId` values.
 
-All user credentials must be re-registered. Existing registrations on `0xfd600B14Dc5A145ec9293Fd5768ae10Ccc1E91Fe` are not accessible from `0xbF9b2556e6Dd64D60E08E3669CeF2a4293e006db`.
+All user credentials must be re-registered. Existing registrations on `0xfd600B14Dc5A145ec9293Fd5768ae10Ccc1E91Fe` are not accessible from `0x17a22f130d4e1c4ba5C20a679a5a29F227083A62`.
 
 ## No Changes Required
 

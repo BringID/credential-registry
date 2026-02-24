@@ -1,6 +1,6 @@
 # Migration Guide — Credential Registry v3 (Redeployment)
 
-This guide covers breaking changes between the previous deployment (`0xfd600B14Dc5A145ec9293Fd5768ae10Ccc1E91Fe`) and the current deployment (`0xbF9b2556e6Dd64D60E08E3669CeF2a4293e006db`). All consuming apps must update.
+This guide covers breaking changes between the previous deployment (`0xfd600B14Dc5A145ec9293Fd5768ae10Ccc1E91Fe`) and the current deployment (`0x17a22f130d4e1c4ba5C20a679a5a29F227083A62`). All consuming apps must update.
 
 ## Deployed Contracts
 
@@ -19,11 +19,11 @@ Contract addresses are identical on both chains (same deployer, same nonce).
 | Contract | Address | Chains |
 |---|---|---|
 | Semaphore | `0x8A1fd199516489B0Fb7153EB5f075cDAC83c693D` | mainnet (8453), Sepolia (84532) |
-| CredentialRegistry | `0xbF9b2556e6Dd64D60E08E3669CeF2a4293e006db` | mainnet (8453), Sepolia (84532) |
-| DefaultScorer | `0x315044578dd9480Dd25427E4a4d94b0fc2Fa4f8c` | mainnet (8453), Sepolia (84532) |
-| ScorerFactory | `0xAa03996D720C162Fdff246E1D3CEecc792986750` | mainnet (8453), Sepolia (84532) |
+| CredentialRegistry | `0x17a22f130d4e1c4ba5C20a679a5a29F227083A62` | mainnet (8453), Sepolia (84532) |
+| DefaultScorer | `0x6791B588dAdeb4323bc1C3d987130bC13cBe3625` | mainnet (8453), Sepolia (84532) |
+| ScorerFactory | `0x016bC46169533a8d3284c5D8DD590C91783C8C06` | mainnet (8453), Sepolia (84532) |
 
-Owner: `0x6F0CDcd334BA91A5E221582665Cce0431aD4Fc0b`
+Owner: `0x677112864ED447866f8D461ABe284E5e907bB4F8`
 Trusted verifier (Sepolia): `0x3c50f7055D804b51e506Bc1EA7D082cB1548376C`
 Trusted verifier (mainnet): `0x9186aA65288bFfa67fB58255AeeaFfc4515535d9`
 
