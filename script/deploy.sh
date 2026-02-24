@@ -399,6 +399,55 @@ fi
 echo ""
 
 # ══════════════════════════════════════════════════════════════════════════════
+# Step 6: Verify contracts on BaseScan
+# ══════════════════════════════════════════════════════════════════════════════
+if [[ -n "${BASESCAN_API_KEY:-}" && "$DRY_RUN" == false ]]; then
+  echo -e "${BOLD}Step 6: Verifying contracts on BaseScan${NC}"
+  echo "─────────────────────────────────────────"
+
+  # CredentialRegistry
+  echo -e "  Verifying CredentialRegistry..."
+  FOUNDRY_PROFILE=default forge verify-contract "$REGISTRY_ADDRESS" \
+    contracts/registry/CredentialRegistry.sol:CredentialRegistry \
+    --chain-id "$CHAIN_ID" \
+    --etherscan-api-key "$BASESCAN_API_KEY" \
+    --constructor-args $(cast abi-encode "constructor(address,address,uint256)" "$SEMAPHORE_ADDRESS" "$TRUSTED_VERIFIER" 300) \
+    --watch \
+    && echo -e "  ${GREEN}✓ CredentialRegistry verified${NC}" \
+    || echo -e "  ${YELLOW}⚠ CredentialRegistry verification failed (verify manually)${NC}"
+
+  # DefaultScorer
+  if [[ -n "${DEFAULT_SCORER_ADDRESS:-}" && "$DEFAULT_SCORER_ADDRESS" != "null" ]]; then
+    echo -e "  Verifying DefaultScorer..."
+    FOUNDRY_PROFILE=default forge verify-contract "$DEFAULT_SCORER_ADDRESS" \
+      contracts/scoring/DefaultScorer.sol:DefaultScorer \
+      --chain-id "$CHAIN_ID" \
+      --etherscan-api-key "$BASESCAN_API_KEY" \
+      --constructor-args $(cast abi-encode "constructor(address)" "$DEPLOYER_ADDRESS") \
+      --watch \
+      && echo -e "  ${GREEN}✓ DefaultScorer verified${NC}" \
+      || echo -e "  ${YELLOW}⚠ DefaultScorer verification failed (verify manually)${NC}"
+  fi
+
+  # ScorerFactory
+  if [[ -n "${SCORER_FACTORY_ADDRESS:-}" && "${SCORER_FACTORY_ADDRESS:-}" != "null" && "$SKIP_SCORER_FACTORY" == false ]]; then
+    echo -e "  Verifying ScorerFactory..."
+    FOUNDRY_PROFILE=default forge verify-contract "$SCORER_FACTORY_ADDRESS" \
+      contracts/scoring/ScorerFactory.sol:ScorerFactory \
+      --chain-id "$CHAIN_ID" \
+      --etherscan-api-key "$BASESCAN_API_KEY" \
+      --watch \
+      && echo -e "  ${GREEN}✓ ScorerFactory verified${NC}" \
+      || echo -e "  ${YELLOW}⚠ ScorerFactory verification failed (verify manually)${NC}"
+  fi
+
+  echo ""
+elif [[ "$DRY_RUN" == false ]]; then
+  echo -e "${YELLOW}Skipping BaseScan verification (no BASESCAN_API_KEY)${NC}"
+  echo ""
+fi
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Summary
 # ══════════════════════════════════════════════════════════════════════════════
 echo -e "${BOLD}═══════════════════════════════════════════${NC}"
