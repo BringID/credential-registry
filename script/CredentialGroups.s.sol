@@ -26,6 +26,9 @@ import {Script, console} from "forge-std/Script.sol";
 ///  13 | Apple Subs        | —      |  10
 ///  14 | Binance KYC       | —      |  20
 ///  15 | OKX KYC           | —      |  20
+///  16 | Reddit            | Low    |   2
+///  17 | Reddit            | Medium |   5
+///  18 | Reddit            | High   |  10
 ///
 /// Usage:
 ///   PRIVATE_KEY=<key> CREDENTIAL_REGISTRY_ADDRESS=<addr> \
@@ -39,10 +42,10 @@ contract DeployCredentialGroups is Script {
         DefaultScorer scorer = DefaultScorer(registry.defaultScorer());
 
         // --- credential group IDs, validity durations, families, and scores ---
-        uint256[] memory ids = new uint256[](15);
-        uint256[] memory durations = new uint256[](15);
-        uint256[] memory families = new uint256[](15);
-        uint256[] memory scores = new uint256[](15);
+        uint256[] memory ids = new uint256[](18);
+        uint256[] memory durations = new uint256[](18);
+        uint256[] memory families = new uint256[](18);
+        uint256[] memory scores = new uint256[](18);
 
         // Farcaster Low / Medium / High — 30 / 60 / 90 days, family 1
         ids[0] = 1;
@@ -109,6 +112,20 @@ contract DeployCredentialGroups is Script {
         ids[14] = 15; // OKX KYC
         durations[14] = 180 days;
         scores[14] = 20;
+
+        // Reddit Low / Medium / High — 30 / 60 / 90 days, family 4
+        ids[15] = 16;
+        durations[15] = 30 days;
+        families[15] = 4;
+        scores[15] = 2;
+        ids[16] = 17;
+        durations[16] = 60 days;
+        families[16] = 4;
+        scores[16] = 5;
+        ids[17] = 18;
+        durations[17] = 90 days;
+        families[17] = 4;
+        scores[17] = 10;
 
         // Create credential groups that don't already exist
         for (uint256 i = 0; i < ids.length; i++) {
