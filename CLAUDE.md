@@ -92,6 +92,9 @@ identity = new Identity(seed)
 | 13 | Apple Subs | — | 0 | 10 | 180 days |
 | 14 | Binance KYC | — | 0 | 20 | 180 days |
 | 15 | OKX KYC | — | 0 | 20 | 180 days |
+| 16 | Reddit | Low | 4 | 2 | 30 days |
+| 17 | Reddit | Medium | 4 | 5 | 60 days |
+| 18 | Reddit | High | 4 | 10 | 90 days |
 
 ## Architecture
 
@@ -147,7 +150,7 @@ contracts/
 - **Ownable2Step** (OpenZeppelin) for admin operations — two-step ownership transfer.
 - **Per-app Semaphore groups**: each (credentialGroup, app) pair gets its own Semaphore group, created lazily on first registration. Since Semaphore enforces per-group nullifier uniqueness, separate groups per app naturally prevent cross-app proof replay — no second circuit needed.
 - **Credential state**: per-credential state is stored in a single `credentials` mapping (`bytes32 registrationHash => CredentialRecord`). The registration hash uses a two-slot encoding to prevent collisions: for family groups (familyId > 0): `keccak256(registry, familyId, 0, credentialId, appId)` — all groups in the same family share one slot; for standalone groups (familyId == 0): `keccak256(registry, 0, credentialGroupId, credentialId, appId)`. The `credentialGroupId` is stored in `CredentialRecord` to track which specific group the credential belongs to.
-- **Family enforcement**: credential groups with the same `familyId` (> 0) share a registration hash, so a user can only hold one credential per family per app (e.g. cannot have both Farcaster Low and Farcaster High). Group changes within a family go through the recovery timelock (`initiateRecovery`/`executeRecovery`) to prevent double-spend with different Semaphore nullifiers. Standalone groups (familyId = 0) have no family constraint. Family IDs: 1 = Farcaster (groups 1–3), 2 = GitHub (groups 4–6), 3 = X/Twitter (groups 7–9), 0 = standalone (groups 10–15).
+- **Family enforcement**: credential groups with the same `familyId` (> 0) share a registration hash, so a user can only hold one credential per family per app (e.g. cannot have both Farcaster Low and Farcaster High). Group changes within a family go through the recovery timelock (`initiateRecovery`/`executeRecovery`) to prevent double-spend with different Semaphore nullifiers. Standalone groups (familyId = 0) have no family constraint. Family IDs: 1 = Farcaster (groups 1–3), 2 = GitHub (groups 4–6), 3 = X/Twitter (groups 7–9), 4 = Reddit (groups 16–18), 0 = standalone (groups 10–15).
 - **Scope binding**: `submitProof` ties proofs to `appId_` + `msg.sender` + a context value via `scope == keccak256(abi.encode(appId_, msg.sender, context))`, preventing proof replay across apps and callers. The `appId_` is a consumer-controlled function parameter (not taken from the proof struct), so an attacker cannot substitute a different app's scorer.
 - **App-specific identities**: each app derives a unique Semaphore commitment from `keccak256(abi.encodePacked(walletPrivateKey, appId, credentialGroupId))` fed into `new Identity(seed)`. This ensures per-app and per-credential-group isolation.
 - **Trusted verifiers**: multiple signers supported via `trustedVerifiers` mapping with `addTrustedVerifier`/`removeTrustedVerifier`. Supports TLSN, OAuth, zkPassport, etc.
