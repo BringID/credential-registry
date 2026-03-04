@@ -43,6 +43,9 @@ Contract addresses are identical on both chains (same deployer, same nonce).
 | 13 | Apple Subs | — | — | 10 | 180 days |
 | 14 | Binance KYC | — | — | 20 | 180 days |
 | 15 | OKX KYC | — | — | 20 | 180 days |
+| 16 | Reddit | Low | 4 | 2 | 30 days |
+| 17 | Reddit | Medium | 4 | 5 | 60 days |
+| 18 | Reddit | High | 4 | 10 | 90 days |
 
 ## Integrating Proof Consumption (Front-Running Protection)
 
